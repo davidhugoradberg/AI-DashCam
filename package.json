@@ -1,0 +1,14 @@
+{
+  "name": "dashcam-license-plate",
+  "version": "1.0.0",
+  "description": "Dashcam som detekterar bilar och läser av registreringsnummer",
+  "main": "image-capture.js",
+  "scripts": {
+    "start": "node image-capture.js"
+  },
+  "dependencies": {
+    "@google-cloud/vision": "^2.4.2",
+    "@tensorflow/tfjs-node": "^3.18.0",
+    "canvas": "^2.9.1"
+  }
+}

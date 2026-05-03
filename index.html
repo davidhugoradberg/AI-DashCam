@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>License Plate OCR</title>
+
+  <script src="https://livejs.com/live.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.12.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-automl@1.3.0/dist/tf-automl.min.js"></script>
+  <script src="https://unpkg.com/tesseract.js@2.1.4/dist/tesseract.min.js"></script>
+
+  <link 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" 
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Original Image</th>
+        <th scope="col">License Plate Detected</th>
+      </tr>
+    </thead>
+
+    <tr>
+      <td>
+        <img 
+          id="license-plate-image" 
+          crossorigin="anonymous" 
+          src="http://raspberrypi.local/app/images/Cars1.png"
+        >
+      </td>
+
+      <td>
+        <canvas id="canvas"></canvas>
+      </td>
+    </tr>
+
+    <tr>
+      <th scope="row">
+        <h2>License Plate (Google Vision)</h2>
+      </th>
+      <td>
+        <h3 class="license">
+          E 220<br>
+          538<br>
+          <mark>PG MN112</mark><br>
+          COI<br>
+        </h3>
+      </td>
+    </tr>
+
+    <tr>
+      <th scope="row">
+        <h2>Tesseract JS OCR</h2>
+      </th>
+      <td>
+        <h3 class="tesseract"></h3>
+      </td>
+    </tr>
+  </table>
+
+  <script>
+    async function run() {
+      const model = await tf.automl.loadObjectDetection(
+        'http://raspberrypi.local/app/ML-model/model.json'
+      );
+
+      const img = document.getElementById('license-plate-image');
+
+      const options = {
+        score: 0.5,
+        iou: 0.5,
+        topk: 20
+      };
+
+      const predictions = await model.detect(img, options);
+
+      const img3 = document.getElementById('license-plate-image');
+      const imageWidth = img3.clientWidth;
+      const imageHeight = img3.clientHeight;
+
+      const c = document.getElementById("canvas");
+      const ctx = c.getContext("2d");
+
+      ctx.canvas.width = imageWidth;
+      ctx.canvas.height = imageHeight;
+
+      if (predictions && predictions[0]) {
+        const left = predictions[0].box.left - 15;
+        const top = predictions[0].box.top - 15;
+        const width = predictions[0].box.width + 35;
+        const height = predictions[0].box.height + 35;
+
+        ctx.drawImage(img3, left, top, width, height, left, top, width, height);
+      }
+
+      const worker = Tesseract.createWorker({
+        logger: m => console.log(m)
+      });
+
+      Tesseract.setLogging(true);
+
+      await worker.load();
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+
+      await worker.setParameters({
+        tessedit_pageseg_mode: 13,
+      });
+
+      const croppedImage = c.toDataURL("image/png");
+      const result = await worker.recognize(croppedImage);
+
+      console.log(result);
+
+      document.querySelector(".tesseract").innerHTML = JSON.stringify(
+        result.data.text,
+        null,
+        2
+      );
+
+      await worker.terminate();
+    }
+
+    run();
+  </script>
+
+</body>
+</html>

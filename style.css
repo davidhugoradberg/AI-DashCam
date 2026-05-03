@@ -1,0 +1,17 @@
+thead {
+  font-size: 30px;
+}
+
+h3.license {
+  font-size: 16px;
+  line-height: 30px;
+}
+
+mark {
+  font-size: 25px;
+  line-height: 30px;
+}
+
+.tesseract {
+  font-size: 15px;
+}

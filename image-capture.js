@@ -1,114 +1,77 @@
 const { exec } = require('child_process');
-const vision = require('@google-cloud/vision');
-var fs = require('fs');
+const { VertexAI } = require('@google-cloud/vertexai');
+const fs = require('fs');
 
+// === Konfiguration — ÄNDRA DESSA TVÅ RADER ===
+const PROJECT_ID = 'ditt-projekt-id';   // hittas högst upp i Google Cloud Console
+const LOCATION = 'us-central1';         // eller 'europe-west4' för EU
+// =============================================
+
+const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+const model = vertexAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 var takeStill = function () {
-
     var child = exec('libcamera-jpeg -n -o ./images/realtime.jpg --shutter 5000000 --gain 0.5 --width 700 --height 500');
-    // var child = exec('ls');
 
     child.stdout.on('data', function (data) {
-        console.log('child process exited with ' +
-            `code ${data}`);
+        console.log('child process: ' + data);
     });
 
     child.on('exit', function (code, signal) {
         console.log('Image Capture   ' + Date.now());
 
+        async function readPlate() {
+            try {
+                // Läs in bilden som base64
+                const imageBytes = fs.readFileSync('./images/realtime.jpg').toString('base64');
 
+                // Skicka till Gemini via Vertex AI
+                const result = await model.generateContent({
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            { text: 'Read the license plate from the car in this image. Reply with ONLY the plate number, nothing else. If no plate is visible, reply with the word: NONE' },
+                            { inlineData: { mimeType: 'image/jpeg', data: imageBytes } }
+                        ]
+                    }]
+                });
 
-        async function setEndpoint() {
-            // Specifies the location of the api endpoint
-            const clientOptions = { apiEndpoint: 'eu-vision.googleapis.com' };
+                let license_number = result.response.candidates[0].content.parts[0].text.trim();
+                console.log('Detected:', license_number);
 
-            // Creates a client
-            const client = new vision.ImageAnnotatorClient(clientOptions);
-
-            // Performs text detection on the image file
-            const [result] = await client.textDetection('./images/realtime.jpg');
-            const labels = result.textAnnotations;
-            console.log('Text:');
-
-            //  labels.forEach(label => console.log(label.description));
-
-            //  console.log(labels);
-
-            var license_number = null;
-
-            labels.forEach(function (a, b) {
-
-                //console.log(a.description);
-
-                if (b == 0) {
-                    license_number = a.description;
-                }
-
-            });
-
-
-
-            var html = "";
-
-            if (license_number == null) {
-                license_number = "None Detected"
-            } else {
-
-                license_number = license_number.split(/\n|\r|\t/g);
-
-                for (var i = 0; i < license_number.length; i++) {
-
-                    console.log(license_number[i]);
-
-                    if (/\w{2,5}\s{1,2}\w{2,5}$/gi.test(license_number[i]) && /\d+/gi.test(license_number[i])) {
-                        html += "<mark>" + license_number[i] + "</mark><br>";
-                    } else {
-                        html += license_number[i] + "<br>";
+                let html = '';
+                if (!license_number || license_number.toUpperCase() === 'NONE') {
+                    html = 'None Detected';
+                } else {
+                    // Dela upp på radbrytningar (om Gemini svarar med flera plåtar)
+                    const lines = license_number.split(/\n|\r|\t/g);
+                    for (let i = 0; i < lines.length; i++) {
+                        console.log(lines[i]);
+                        html += lines[i] + '<br/>';
                     }
-
                 }
 
+                // Uppdatera HTML-filen
+                const data = fs.readFileSync('./html/index.html', 'utf-8');
+                const newValue = data.replace(/class="license">.*?<\/h3>/gi, 'class="license">' + html + '</h3>');
+                fs.writeFileSync('./html/index.html', newValue, 'utf-8');
+
+                console.log('HTML updated');
+            } catch (err) {
+                console.error('Vertex AI error:', err.message);
             }
 
-            var data = fs.readFileSync('./html/index.html', 'utf-8');
-
-            var newValue = data.replace(/class="license">.*?<.h3>/gi, 'class="license">' + html + '</h3>');
-
-            fs.writeFileSync('./html/index.html', newValue, 'utf-8');
-
-            console.log('readFileSync complete');
-
-
-
-
+            // Ta nästa bild
             takeStill();
-
-
-
-
         }
-        setEndpoint();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        readPlate();
     });
 }
 
-
 takeStill();
+
+
 
 
 
